@@ -1,0 +1,59 @@
+# This is for an AWS EC2 instance created with AMI ID: ami-0b44875c31a391212
+# and AMI name: Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.7 (Amazon Linux 2023) 20250906
+
+# Use the official Nvidia CUDA base image
+FROM nvidia/cuda:12.8.0-base-ubuntu22.04
+
+# Set the working directory
+WORKDIR /root
+
+# Set the non-interactive frontend for tzdata configuration
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    wget \
+    curl \
+    git \
+    git-lfs \
+    vim \
+    awscli \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get autoremove -y \
+    && apt-get clean
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+ENV CONDA_DIR /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && rm ~/miniconda.sh
+
+
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+
+RUN conda init bash
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+    && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+RUN conda create --name boltz python=3.10
+
+# Activate conda base environment by default
+RUN echo "conda activate boltz" >> ~/.bashrc
+#RUN conda install -n boltz -y pytorch==2.0.0 pytorch-cuda=12.8 -c pytorch -c nvidia
+
+ENV PATH /opt/conda/envs/boltz/bin:$PATH
+
+# Set environmental variables for GitHub credentials
+ARG GITHUB_USERNAME
+ARG GITHUB_TOKEN
+
+# Clone the repository
+RUN git clone https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/yudhajitp/boltz.git
+
+#Set the working directory to the clone repository
+WORKDIR /root/boltz/
+
+
+RUN conda run -n boltz && pip install -e .[cuda]
